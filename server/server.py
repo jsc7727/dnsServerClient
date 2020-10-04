@@ -100,7 +100,7 @@ def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
                     #print(result)
 
                     if result == "error":
-                        errorHandler(addr, f, connect, "not found ip or domain by web");
+                        errorHandler(addr, f, connect, "not found ip or domain by web\n")
                         continue
 
                     # domain은 여러개가 가능하므로 해당 ip가 있는지 확인후 있다면 테이블에 맞춰 도메인만 추가해준다.
