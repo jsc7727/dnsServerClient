@@ -20,7 +20,7 @@ while True:
             dictData = json.loads(str(data, 'utf-8'))
             for x in dictData:
                 print(f"domain : {x['domain']} | address : {x['address']} | count : {x['count']} | "
-                      f"{x['startDate']} | endDate : {x['endDate']}")
+                      f"startDate : {x['startDate']} | endDate : {x['endDate']}")
             print()
             continue
         elif byteQuery == b'quit' and b'q':
