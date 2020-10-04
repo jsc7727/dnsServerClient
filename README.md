@@ -50,3 +50,5 @@ member를 추가할 수 있음.
 # dns client
 
 1. python ./client.py
+
+2. input **ip** or **domain** or **'domain hit'** or **'quit'**
