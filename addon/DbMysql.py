@@ -20,29 +20,35 @@ class mysql:
         if check == 'yes':
             self.dropTable()
             self.mkIpTable()
+            print("삭제후 재생성 성공")
 
     def hitCount(self, limit=(-1)):
+        sql = "SELECT domain, INET_NTOA(address) as address, count, startDate, endDate FROM dnssc.domain_table LEFT OUTER JOIN dnssc.ip_table ON ip_table.id = domain_table.ip_table_id ORDER BY count DESC"
+        if limit != -1:
+            sql + f"limit {limit}"
+        self.cursorDict.execute(sql)
+        data = self.cursorDict.fetchall()
+        return data
+
+    def getCacheFromDb(self, limit=(-1)):
         sql = "SELECT domain, INET_NTOA(address) as address, count FROM dnssc.domain_table LEFT OUTER JOIN dnssc.ip_table ON ip_table.id = domain_table.ip_table_id ORDER BY count DESC"
         if limit != -1:
             sql + f"limit {limit}"
         self.cursorDict.execute(sql)
         data = self.cursorDict.fetchall()
-        print(type(data))
         return data
 
-    def getIpTableId(self, ip):
-        sql = "SELECT id FROM dnssc.ip_table WHERE address = INET_ATON(%s) FOR UPDATE"
+    def getIpTable(self, ip):
+        sql = "SELECT id,count FROM dnssc.ip_table WHERE address = INET_ATON(%s)"
         val = (ip,)
         print(f"ip: {ip}")
-        self.cursor.execute(sql, val)
-        getIpTableNumber = self.cursor.fetchone()
-        print(getIpTableNumber)
-        if getIpTableNumber:
-            getIpTableNumber = getIpTableNumber[0]
-        return getIpTableNumber
+        self.cursorDict.execute(sql, val)
+        getIpTable = self.cursorDict.fetchone()
+        print(getIpTable)
+        return getIpTable
 
     def addIp(self, ip, count=1):
-        sql = "INSERT INTO ip_table (address,count,date) VALUES (INET_ATON(%s), %s, (now()))"
+        sql = "INSERT INTO ip_table (address,count,startDate,endDate) VALUES (INET_ATON(%s), %s, now(), now())"
         val = (ip, count)
         self.cursor.execute(sql, val)
         print(self.cursor.rowcount, " : ip가 성공적으로 추가됨.")
@@ -57,7 +63,7 @@ class mysql:
         self.conn.commit()
 
     def addCount(self, ip):
-        sql = "UPDATE ip_table SET count = count + 1 WHERE ip_table.address = INET_ATON(%s);"
+        sql = "UPDATE ip_table SET count = count + 1, endDate = now() WHERE ip_table.address = INET_ATON(%s);"
         print(ip)
         self.cursor.execute(sql, (ip,))
         self.conn.commit()
@@ -76,6 +82,21 @@ class mysql:
         data = self.cursor.fetchall()
         return data
 
+    def dicFindIpByDomain(self, domain):
+        sql = "SELECT domain, INET_NTOA(address) as address, ip_table.id, count FROM dnssc.domain_table LEFT OUTER JOIN dnssc.ip_table ON ip_table.id = domain_table.ip_table_id WHERE domain_table.domain = (%s);"
+        val = (domain,)
+        self.cursorDict.execute(sql, val)
+        data = self.cursorDict.fetchone()
+        return data
+
+    def dicFindDomainByIp(self, ip):
+        sql = "SELECT domain, INET_NTOA(address) as address, ip_table.id, count FROM dnssc.domain_table LEFT OUTER JOIN dnssc.ip_table ON ip_table.id = domain_table.ip_table_id WHERE ip_table.address = (INET_ATON(%s));"
+        val = (ip,)
+        self.cursorDict.execute(sql, val)
+        data = self.cursorDict.fetchone()
+        return data
+
+
     def dropTable(self):
         self.cursor.execute("SET foreign_key_checks = 0;")
         self.cursor.execute("DROP TABLE ip_table")
@@ -88,7 +109,8 @@ class mysql:
             "id INT NOT NULL AUTO_INCREMENT,"
             "address INT(4) UNSIGNED NOT NULL,"
             "count INT NOT NULL DEFAULT 0,"
-            "date timestamp NOT NULL,"
+            "startDate timestamp NOT NULL,"
+            "endDate timestamp,"
             "UNIQUE INDEX id_UNIQUE (id ASC) VISIBLE,"
             "UNIQUE INDEX address_UNIQUE (address ASC) VISIBLE,"
             "PRIMARY KEY (id));"

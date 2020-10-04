@@ -3,8 +3,8 @@ import socket
 
 from DNS.addon.DbMysql import mysql
 from DNS.addon.RecModule import file
-from DNS.server.cacheModule import checkCache, initCache, addCache
-from DNS.server.dbModule import dicDbCheck, databaseHit
+from DNS.server.cacheModule import checkCache, initCache
+from DNS.server.dbModule import dicDbCheck, domainHit
 
 port = 12345
 
@@ -35,11 +35,11 @@ def getDataByWeb(recvData, check):
 def checkIpDomain(data):
     rexCheckIp = re.compile('[0-9]+.[0-9]+.[0-9]+.[0-9]+')
     resIp = rexCheckIp.match(data)
-    #print(resIp)
+    print(resIp)
     if resIp is None:
         rexCheckDomain = re.compile("^((?!-)[A-Za-z0-9-]{1,63}(?<!-)\\.)+[A-Za-z]{2,6}")
         resDomain = rexCheckDomain.match(data)
-        #print(resDomain)
+        print(resDomain)
         if resDomain is None:
             return -1
 
@@ -49,7 +49,7 @@ def checkIpDomain(data):
 def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
     try:
         while True:
-            print(f"main start , cache : {cache}")
+            print(f"cash : {cache}")
             result = ""
             recvData = str(connect.recv(1024), 'utf-8')
 
@@ -59,7 +59,7 @@ def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
 
             # domain hit 문자열을 받을 경우
             if recvData == "domain hit":
-                databaseHit(msql,f, connect, addr)
+                domainHit(msql, connect, addr)
                 continue
 
             # ip or domain 확인하기
@@ -73,9 +73,10 @@ def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
                 continue
 
             checkCacheRes = checkCache(cache, recvData, check)
+            print(f"check Cash : {checkCacheRes}\n")
             if checkCacheRes is not None:
-                print("==== cache hit ====")
-                print(f"{checkCacheRes['domain']} : {checkCacheRes['address']} in {cache}\n")
+                print("==== cash hit ====\n")
+                print(cache, end='\n')
                 msql.addCount(checkCacheRes['address'])
                 result = check and checkCacheRes['domain'] or checkCacheRes['address']
 
@@ -86,7 +87,6 @@ def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
                 # ip and address init
                 ip = ""
                 domain = ""
-                count = ""
 
                 queryResponse = dicDbCheck(msql, recvData, check)
                 print(f"queryResponse : {queryResponse}\n")
@@ -94,10 +94,9 @@ def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
                     result = check and queryResponse['domain'] or queryResponse['address']
                     ip = queryResponse['address']
                     domain = queryResponse['domain']
-                    count = queryResponse['count']
                 else:
                     result = getDataByWeb(recvData, check)
-                    #print(result)
+                    print(result)
 
                     if result == "error":
                         errorHandler(addr, f, connect, "not found ip or domain by web");
@@ -106,48 +105,42 @@ def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
                     # domain은 여러개가 가능하므로 해당 ip가 있는지 확인후 있다면 테이블에 맞춰 도메인만 추가해준다.
                     ip = check and recvData or result
                     domain = not check and recvData or result
-                    ipTable = msql.getIpTable(ip)
-                    if ipTable != None:
-                        msql.addDomain(domain, ipTable['id'])
-                        msql.addCount(ip)
-                        count = ipTable['count']
+                    ipId = msql.getIpTableId(ip)
+                    if ipId != None:
+                        ipId = msql.getIpTableId(ip)
+                        msql.addDomain(domain, ipId)
                     else:
-                        msql.addIp(ip)
-                        ipTable = msql.getIpTable(ip)
-                        msql.addDomain(domain, ipTable['id'])
-                        count = ipTable['count']
-                addCache(cache,domain,ip,count)
-                #cache.append({'domain': [domain], 'address': ip,'count': count})
-
-            if result:
-                if type(result) == list:
-                    result = " | ".join(result)
-                connect.sendall(bytes(result, 'utf-8'))
-                f.logWriter(f"\"{recvData}\" = \"{result}\"\n", addr)
+                        msql.addIp(result)
+                        ipId = msql.getIpTableId(ip)
+                        msql.addDomain(domain, ipId)
+                cache.append({'domain': domain, 'ip': ip})
+                if result:
+                    connect.sendall(bytes(result, 'utf-8'))
+                    f.logWriter(f"\"{recvData}\" = \"{result}\"\n", addr)
     except socket.error as error:
         print("error : ", error)
 
+    if __name__ == '__main__':
+        test = 1
+        host = ''  # Symbolic name meaning all available interfaces
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-if __name__ == '__main__':
-    test = 1
-    host = ''  # Symbolic name meaning all available interfaces
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        msql = mysql()
+        f = file("log.txt", 'a+')
 
-    msql = mysql()
-    f = file("log.txt", 'a+')
-
-    f.logWriter(f"create socket localhost {port}---------------------\n")
-    # SOCK_STREAM = TCP
-    # SOCK_DGRAM = UDP
-    s.bind((host, port))
-    s.listen(10)
-    cache = initCache(msql)
-    while True:
-        connect, addr = s.accept()
-        f.logWriter(f"Connected\n", addr)
-        try:
-            recvSend_serv(msql, f, connect, addr, cache)
-        except socket.error as error:
-            print("error : ", error)
-        f.logWriter(f"Disconnected\n\n", addr)
-        connect.close()
+        f.logWriter(f"create socket localhost {port}---------------------\n")
+        # SOCK_STREAM = TCP
+        # SOCK_DGRAM = UDP
+        s.bind((host, port))
+        s.listen(10)
+        cache = initCache(msql)
+        while True:
+            connect, addr = s.accept()
+            f.logWriter(f"Connected\n", addr)
+            try:
+                recvSend_serv(msql, f, connect, addr, cache)
+                #s.sendall("asdf")
+            except socket.error as error:
+                print("error : ", error)
+            f.logWriter(f"Disconnected\n\n", addr)
+            connect.close()

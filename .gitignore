@@ -1,5 +1,5 @@
-.addon/mysqlConfig.conf
-.addon/dbTest.py
-test/
-.server/log.txt
+addon/*.conf
+addon/dbTest.py
+server/*.txt
 __pycache__/
+
