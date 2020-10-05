@@ -13,7 +13,7 @@ while True:
         if not byteQuery:
             print("다시 입력하세요", end="\n")
             continue
-        elif byteQuery == b'domain hit':
+        elif byteQuery == b'getDb':
             print("root domain hit\n")
             s.sendall(byteQuery)
             data = s.recv(1024)

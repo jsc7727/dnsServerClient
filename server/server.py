@@ -3,8 +3,8 @@ import socket
 
 from DNS.addon.DbMysql import mysql
 from DNS.addon.RecModule import file
-from DNS.server.cacheModule import checkCache, initCache, addCache
-from DNS.server.dbModule import dicDbCheck, databaseHit
+from DNS.addon.cacheModule import checkCache, initCache, addCache
+from DNS.addon.dbModule import dicDbCheck, databaseHit
 
 port = 12345
 
@@ -49,6 +49,7 @@ def checkIpDomain(data):
 def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
     try:
         while True:
+            cache = cache[:10]
             print(f"main start , cache : {cache}")
             result = ""
             recvData = str(connect.recv(1024), 'utf-8')
@@ -57,8 +58,8 @@ def recvSend_serv(msql: mysql, f: file, connect, addr, cache):
                 break
             f.logWriter(f"recv data \"{recvData}\"\n", addr)
 
-            # domain hit 문자열을 받을 경우
-            if recvData == "domain hit":
+            # getDb 문자열을 받을 경우
+            if recvData == "getDb":
                 databaseHit(msql,f, connect, addr)
                 continue
 
